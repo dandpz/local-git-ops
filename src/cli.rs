@@ -35,7 +35,8 @@ pub struct Cli {
     #[arg(long, default_value_t = 20)]
     pub top: usize,
 
-    /// Also write the report as a Markdown file
+    /// Also write the report to a file; format chosen by extension
+    /// (.html/.htm → HTML, anything else → Markdown)
     #[arg(long, value_name = "FILE")]
     pub export: Option<PathBuf>,
 
