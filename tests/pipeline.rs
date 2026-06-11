@@ -2,7 +2,7 @@
 
 use git2::{Repository, Signature, Time};
 use local_git_ops::filter::PathFilter;
-use local_git_ops::{export, history, loc, metrics, render};
+use local_git_ops::{export, history, html, loc, metrics, render};
 use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -287,4 +287,73 @@ fn hostile_metadata_is_sanitized() {
     let md = fs::read_to_string(&dest).unwrap();
     assert!(md.contains("Mallory\\|'tick"), "author escaped in export");
     assert!(!md.contains('\u{1b}'));
+}
+
+#[test]
+fn html_export_writes_escaped_report() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repository::init(dir.path()).unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    // Unix filenames may legally contain HTML metacharacters.
+    let hostile_file = "src/<script>alert(1)<.rs";
+    let alice = ("Alice & Co", "alice@example.com");
+    commit(
+        &repo,
+        alice,
+        now - 3 * DAY,
+        "initial commit",
+        hostile_file,
+        "fn a() {}\n",
+    );
+    commit(
+        &repo,
+        alice,
+        now - 2 * DAY,
+        "fix bug here",
+        hostile_file,
+        "fn a() {}\nfn b() {}\n",
+    );
+    commit(
+        &repo,
+        alice,
+        now - DAY,
+        "more work",
+        hostile_file,
+        "fn a() {}\nfn b() {}\nfn c() {}\n",
+    );
+
+    let hist = history::collect(
+        &repo,
+        &history::WindowOpts {
+            max_commits: 100,
+            days: None,
+            now,
+        },
+    )
+    .unwrap();
+    let line_counts = loc::head_line_counts(&repo).unwrap();
+    let report = metrics::Report::compute(&hist, &line_counts, &PathFilter::new(None, true), now);
+
+    let ctx = render::Context {
+        repo_root: "/tmp/example",
+        branch: "main",
+        scope: None,
+        window_desc: "last 3 non-merge commits",
+        top: 20,
+    };
+    let dest = dir.path().join("report.html");
+    html::write_html(&report, &ctx, &dest).unwrap();
+
+    let out = fs::read_to_string(&dest).unwrap();
+    assert!(out.starts_with("<!DOCTYPE html>"));
+    assert!(out.contains("<h2>👥 Ownership &amp; Bus Factor"));
+    // Hostile path and author are escaped, never raw.
+    assert!(!out.contains("<script>"));
+    assert!(out.contains("src/&lt;script&gt;alert(1)&lt;.rs"));
+    assert!(out.contains("Alice &amp; Co"));
+    // Velocity bar rendered.
+    assert!(out.contains("class=\"bar\""));
 }

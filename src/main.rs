@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
-use local_git_ops::{cli, export, filter, history, loc, metrics, render};
+use local_git_ops::{cli, export, filter, history, html, loc, metrics, render};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() {
@@ -59,10 +59,23 @@ fn run() -> Result<()> {
     render::dashboard(&report, &ctx);
 
     if let Some(dest) = &args.export {
-        export::write_markdown(&report, &ctx, dest)?;
+        let ext = dest
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase);
+        let kind = match ext.as_deref() {
+            Some("html" | "htm") => {
+                html::write_html(&report, &ctx, dest)?;
+                "html"
+            }
+            _ => {
+                export::write_markdown(&report, &ctx, dest)?;
+                "markdown"
+            }
+        };
         println!(
             "{} {}",
-            "markdown report written to".dimmed(),
+            format!("{kind} report written to").dimmed(),
             dest.display()
         );
     }

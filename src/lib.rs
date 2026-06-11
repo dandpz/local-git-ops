@@ -5,6 +5,7 @@ pub mod cli;
 pub mod export;
 pub mod filter;
 pub mod history;
+pub mod html;
 pub mod loc;
 pub mod metrics;
 pub mod render;

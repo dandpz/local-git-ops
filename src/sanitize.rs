@@ -28,6 +28,22 @@ pub fn markdown(s: &str) -> String {
         .collect()
 }
 
+/// Escape for interpolation into HTML text and attribute contexts.
+pub fn html(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in strip_controls(s).chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -38,6 +54,14 @@ mod tests {
         assert_eq!(strip_controls("t\u{1b}]0;pwned\u{7}"), "t]0;pwned");
         assert_eq!(strip_controls("multi\nline\r\ttext"), "multilinetext");
         assert_eq!(strip_controls("plain text"), "plain text");
+    }
+
+    #[test]
+    fn escapes_html_metacharacters() {
+        assert_eq!(html("<script>"), "&lt;script&gt;");
+        assert_eq!(html(r#"a&b"c'd"#), "a&amp;b&quot;c&#39;d");
+        assert_eq!(html("x\u{1b}[31m"), "x[31m");
+        assert_eq!(html("src/main.rs"), "src/main.rs");
     }
 
     #[test]
