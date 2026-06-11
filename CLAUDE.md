@@ -48,3 +48,4 @@ Commit messages, author names, and file paths are attacker-controlled (untrusted
 - git2 is built with `default-features = false` (no ssh/https transports) — intentional, keeps the tool offline and avoids the OpenSSL build. Don't re-enable.
 - git itself rejects angle brackets in signature names, so test fixtures can't put `<` in an author name (`Signature::new` errors); the sanitizer still handles it for hand-crafted commits.
 - File-level metrics exclude lockfiles/changelogs/vendored/generated paths by default (`filter.rs`) and auto-scope to the cwd when run below the repo root — keep this in mind when interpreting test expectations.
+- Author exclusion (`--exclude-author`, `--exclude-bots`) is enforced inside the history walk (`WindowOpts::authors`), dropping commits before metas exist — excluded users vanish from every metric (churn, ownership, velocity, firefighting), not just the author table.

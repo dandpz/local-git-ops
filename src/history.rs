@@ -48,6 +48,9 @@ pub struct WindowOpts {
     pub max_commits: usize,
     pub days: Option<u32>,
     pub now: i64,
+    /// Commits by excluded authors are dropped before any aggregation, so
+    /// churn, ownership, velocity and firefighting all stay consistent.
+    pub authors: crate::filter::AuthorFilter,
 }
 
 pub fn collect(repo: &Repository, opts: &WindowOpts) -> Result<History> {
@@ -68,12 +71,15 @@ pub fn collect(repo: &Repository, opts: &WindowOpts) -> Result<History> {
             .find_commit(oid)
             .with_context(|| format!("failed to read commit {oid}"))?;
         let message = commit.message().unwrap_or("");
+        // Author names and summaries are attacker-controlled in untrusted
+        // repos — strip control characters before they reach any output.
+        let author =
+            crate::sanitize::strip_controls(commit.author().name().unwrap_or("<unknown>").trim());
+        if opts.authors.excluded(&author) {
+            continue;
+        }
         let meta = CommitMeta {
-            // Author names and summaries are attacker-controlled in untrusted
-            // repos — strip control characters before they reach any output.
-            author: crate::sanitize::strip_controls(
-                commit.author().name().unwrap_or("<unknown>").trim(),
-            ),
+            author,
             time: commit.time().seconds(),
             summary: crate::sanitize::strip_controls(commit.summary().ok().flatten().unwrap_or("")),
             is_merge: commit.parent_count() > 1,

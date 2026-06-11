@@ -9,6 +9,8 @@ pub struct Context<'a> {
     pub branch: &'a str,
     pub scope: Option<&'a str>,
     pub window_desc: &'a str,
+    /// Summary of author exclusions (e.g. "dependabot[bot], *[bot]"), if any.
+    pub excluded_authors: Option<&'a str>,
     pub top: usize,
 }
 
@@ -62,11 +64,15 @@ fn header(report: &Report, ctx: &Context) {
         Some(s) => format!("  scope: {s}/"),
         None => String::new(),
     };
+    let excluded = match ctx.excluded_authors {
+        Some(e) => format!("  excluding authors: {e}"),
+        None => String::new(),
+    };
     println!(
         "{}",
         format!(
-            "window: {} · history: {} commits{}",
-            ctx.window_desc, report.total_commits, scope
+            "window: {} · history: {} commits{}{}",
+            ctx.window_desc, report.total_commits, scope, excluded
         )
         .dimmed()
     );

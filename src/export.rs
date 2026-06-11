@@ -32,6 +32,9 @@ fn build(report: &Report, ctx: &Context) -> String {
     if let Some(scope) = ctx.scope {
         let _ = writeln!(md, "- **Scope:** `{scope}/`");
     }
+    if let Some(excluded) = ctx.excluded_authors {
+        let _ = writeln!(md, "- **Excluded authors:** {}", md_safe(excluded));
+    }
     let _ = writeln!(md, "- **History:** {} commits", report.total_commits);
     let _ = writeln!(md, "- **Generated:** {date} by local-git-ops\n");
 

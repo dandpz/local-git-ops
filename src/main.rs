@@ -34,10 +34,13 @@ fn run() -> Result<()> {
     .filter(|s| !s.is_empty());
     let path_filter = filter::PathFilter::new(scope.clone(), !args.no_default_filters);
 
+    let author_filter = filter::AuthorFilter::new(&args.exclude_author, args.exclude_bots);
+    let excluded_desc = author_filter.describe();
     let window = history::WindowOpts {
         max_commits: args.max_commits(),
         days: args.days,
         now,
+        authors: author_filter,
     };
     let hist = history::collect(&repo, &window)?;
     let line_counts = loc::head_line_counts(&repo)?;
@@ -53,6 +56,7 @@ fn run() -> Result<()> {
         branch: &branch,
         scope: scope.as_deref(),
         window_desc: &window_desc,
+        excluded_authors: excluded_desc.as_deref(),
         top: args.top,
     };
 

@@ -85,6 +85,13 @@ fn build(report: &Report, ctx: &Context) -> String {
             esc(scope)
         );
     }
+    if let Some(excluded) = ctx.excluded_authors {
+        let _ = writeln!(
+            h,
+            "<li><strong>Excluded authors:</strong> {}</li>",
+            esc(excluded)
+        );
+    }
     let _ = writeln!(
         h,
         "<li><strong>History:</strong> {} commits</li>",

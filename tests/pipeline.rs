@@ -90,6 +90,7 @@ fn full_pipeline_on_synthetic_repo() {
         max_commits: 100,
         days: None,
         now,
+        authors: Default::default(),
     };
     let hist = history::collect(&repo, &window).unwrap();
     assert_eq!(hist.metas.len(), 5);
@@ -163,6 +164,7 @@ fn window_cap_and_scope() {
             max_commits: 4,
             days: None,
             now,
+            authors: Default::default(),
         },
     )
     .unwrap();
@@ -200,6 +202,7 @@ fn markdown_export_writes_report() {
             max_commits: 100,
             days: None,
             now,
+            authors: Default::default(),
         },
     )
     .unwrap();
@@ -210,6 +213,7 @@ fn markdown_export_writes_report() {
         repo_root: "/tmp/example",
         branch: "main",
         scope: None,
+        excluded_authors: None,
         window_desc: "last 1 non-merge commits",
         top: 20,
     };
@@ -257,6 +261,7 @@ fn hostile_metadata_is_sanitized() {
             max_commits: 100,
             days: None,
             now,
+            authors: Default::default(),
         },
     )
     .unwrap();
@@ -279,6 +284,7 @@ fn hostile_metadata_is_sanitized() {
         repo_root: "/tmp/example",
         branch: "main",
         scope: None,
+        excluded_authors: None,
         window_desc: "last 2 non-merge commits",
         top: 20,
     };
@@ -331,6 +337,7 @@ fn html_export_writes_escaped_report() {
             max_commits: 100,
             days: None,
             now,
+            authors: Default::default(),
         },
     )
     .unwrap();
@@ -341,6 +348,7 @@ fn html_export_writes_escaped_report() {
         repo_root: "/tmp/example",
         branch: "main",
         scope: None,
+        excluded_authors: None,
         window_desc: "last 3 non-merge commits",
         top: 20,
     };
@@ -356,4 +364,84 @@ fn html_export_writes_escaped_report() {
     assert!(out.contains("Alice &amp; Co"));
     // Velocity bar rendered.
     assert!(out.contains("class=\"bar\""));
+}
+
+#[test]
+fn excluded_authors_vanish_from_all_metrics() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repository::init(dir.path()).unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let alice = ("Alice", "alice@example.com");
+    let bot = ("dependabot[bot]", "support@github.com");
+    let mallory = ("Mallory", "m@example.com");
+
+    commit(
+        &repo,
+        alice,
+        now - 6 * DAY,
+        "initial commit",
+        "src/core.rs",
+        "fn a() {}\n",
+    );
+    commit(
+        &repo,
+        alice,
+        now - 5 * DAY,
+        "more core",
+        "src/core.rs",
+        "fn a() {}\nfn b() {}\n",
+    );
+    // Bot churns a non-lockfile path so only the author filter can drop it.
+    commit(
+        &repo,
+        bot,
+        now - 4 * DAY,
+        "bump deps",
+        "deps/manifest.txt",
+        "v1\n",
+    );
+    commit(
+        &repo,
+        bot,
+        now - 3 * DAY,
+        "bump deps again",
+        "deps/manifest.txt",
+        "v2\n",
+    );
+    commit(
+        &repo,
+        mallory,
+        now - 2 * DAY,
+        "noise",
+        "src/extra.rs",
+        "fn x() {}\n",
+    );
+
+    let hist = history::collect(
+        &repo,
+        &history::WindowOpts {
+            max_commits: 100,
+            days: None,
+            now,
+            authors: local_git_ops::filter::AuthorFilter::new(&["mallory".to_string()], true),
+        },
+    )
+    .unwrap();
+
+    // Bot + Mallory commits dropped from history entirely.
+    assert_eq!(hist.metas.len(), 2);
+    assert!(hist.metas.iter().all(|m| m.author == "Alice"));
+
+    let line_counts = loc::head_line_counts(&repo).unwrap();
+    let report = metrics::Report::compute(&hist, &line_counts, &PathFilter::new(None, true), now);
+
+    assert_eq!(report.authors.len(), 1);
+    assert_eq!(report.authors[0].name, "Alice");
+    assert!(report.files.iter().all(|f| !f.path.starts_with("deps/")));
+    assert!(report.files.iter().all(|f| f.path != "src/extra.rs"));
+    // Velocity counts only the remaining commits.
+    assert_eq!(report.velocity.months.values().sum::<u32>(), 2);
 }
