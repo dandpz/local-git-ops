@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="300" viewBox="0 0 860 300" role="img" aria-label="local-git-ops — offline git repository health dashboard">
+  <defs>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#39d2ff"/>
+      <stop offset="1" stop-color="#2188ff"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#f85149"/>
+      <stop offset="1" stop-color="#ffbd2e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- terminal window -->
+  <rect x="1.5" y="1.5" width="857" height="297" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="3"/>
+  <path d="M1.5 38 h857" stroke="#21262d" stroke-width="1.5"/>
+  <rect x="1.5" y="1.5" width="857" height="36.5" rx="14" fill="#161b22"/>
+  <rect x="1.5" y="20" width="857" height="18" fill="#161b22"/>
+
+  <!-- traffic lights -->
+  <circle cx="24" cy="20" r="6.5" fill="#ff5f56"/>
+  <circle cx="46" cy="20" r="6.5" fill="#ffbd2e"/>
+  <circle cx="68" cy="20" r="6.5" fill="#27c93f"/>
+  <text x="430" y="25" text-anchor="middle" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13" fill="#8b949e">~/your-repo</text>
+
+  <!-- prompt -->
+  <text x="36" y="72" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="17">
+    <tspan fill="#3fb950">$</tspan>
+    <tspan fill="#e6edf3" dx="6">local-git-ops</tspan>
+    <tspan fill="#484f58" dx="10">--export report.md</tspan>
+  </text>
+
+  <!-- commit graph (left) -->
+  <g stroke="#30363d" stroke-width="2.5" fill="none">
+    <path d="M64 110 v140"/>
+    <path d="M64 150 c0 22 36 14 36 36 v24"/>
+  </g>
+  <g stroke="#0d1117" stroke-width="3">
+    <circle cx="64" cy="110" r="7" fill="#39d2ff"/>
+    <circle cx="64" cy="150" r="7" fill="#39d2ff"/>
+    <circle cx="100" cy="210" r="7" fill="#3fb950"/>
+    <circle cx="64" cy="196" r="7" fill="#39d2ff"/>
+    <circle cx="64" cy="250" r="7" fill="#ffbd2e"/>
+  </g>
+
+  <!-- hotspot rows (middle) -->
+  <g font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13" font-weight="bold">
+    <rect x="150" y="103" width="86" height="22" rx="6" fill="#3d1418" stroke="#f85149"/>
+    <text x="193" y="119" text-anchor="middle" fill="#f85149">CRITICAL</text>
+    <rect x="150" y="139" width="86" height="22" rx="6" fill="#3a2d10" stroke="#d29922"/>
+    <text x="193" y="155" text-anchor="middle" fill="#e3b341">HIGH</text>
+    <rect x="150" y="175" width="86" height="22" rx="6" fill="#12261e" stroke="#2ea043"/>
+    <text x="193" y="191" text-anchor="middle" fill="#3fb950">WATCH</text>
+    <rect x="150" y="211" width="86" height="22" rx="6" fill="#12261e" stroke="#2ea043"/>
+    <text x="193" y="227" text-anchor="middle" fill="#3fb950">WATCH</text>
+  </g>
+  <g fill="#30363d">
+    <rect x="252" y="108" width="208" height="12" rx="6"/>
+    <rect x="252" y="144" width="164" height="12" rx="6"/>
+    <rect x="252" y="180" width="186" height="12" rx="6"/>
+    <rect x="252" y="216" width="132" height="12" rx="6"/>
+  </g>
+  <!-- churn bars overlaid on rows -->
+  <g fill="url(#bar)">
+    <rect x="252" y="108" width="176" height="12" rx="6"/>
+    <rect x="252" y="144" width="118" height="12" rx="6"/>
+    <rect x="252" y="180" width="84" height="12" rx="6"/>
+    <rect x="252" y="216" width="52" height="12" rx="6"/>
+  </g>
+
+  <!-- flame on the critical row -->
+  <path d="M488 122 c-7 -7 -8 -15 -2 -22 c0 6 3 8 5 9 c-2 -8 1 -15 8 -19 c-2 7 1 10 4 13 c3 3 6 8 4 14 c-2 7 -12 12 -19 5 z" fill="url(#flame)"/>
+
+  <!-- velocity chart (right) -->
+  <g fill="#1f6feb" opacity="0.9">
+    <rect x="560" y="208" width="22" height="42" rx="4"/>
+    <rect x="592" y="178" width="22" height="72" rx="4"/>
+    <rect x="624" y="192" width="22" height="58" rx="4"/>
+    <rect x="656" y="152" width="22" height="98" rx="4"/>
+    <rect x="688" y="136" width="22" height="114" rx="4"/>
+    <rect x="720" y="166" width="22" height="84" rx="4"/>
+    <rect x="752" y="118" width="22" height="132" rx="4"/>
+    <rect x="784" y="100" width="22" height="150" rx="4"/>
+  </g>
+  <path d="M560 198 l64 -34 l64 -28 l64 6 l64 -52" fill="none" stroke="#39d2ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- footer tagline -->
+  <text x="36" y="282" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b949e">offline git health dashboard · churn · hotspots · bus factor · velocity</text>
+</svg>

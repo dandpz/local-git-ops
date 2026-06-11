@@ -1,0 +1,290 @@
+//! End-to-end pipeline test against a real repository built with git2.
+
+use git2::{Repository, Signature, Time};
+use local_git_ops::filter::PathFilter;
+use local_git_ops::{export, history, loc, metrics, render};
+use std::fs;
+use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+const DAY: i64 = 86_400;
+
+fn commit(
+    repo: &Repository,
+    author: (&str, &str),
+    secs: i64,
+    msg: &str,
+    file: &str,
+    content: &str,
+) {
+    let workdir = repo.workdir().unwrap();
+    let path = workdir.join(file);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, content).unwrap();
+
+    let mut index = repo.index().unwrap();
+    index.add_path(Path::new(file)).unwrap();
+    index.write().unwrap();
+    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+
+    let sig = Signature::new(author.0, author.1, &Time::new(secs, 0)).unwrap();
+    let parent = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
+    let parents: Vec<&git2::Commit> = parent.iter().collect();
+    repo.commit(Some("HEAD"), &sig, &sig, msg, &tree, &parents)
+        .unwrap();
+}
+
+#[test]
+fn full_pipeline_on_synthetic_repo() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repository::init(dir.path()).unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let alice = ("Alice", "alice@example.com");
+    let bob = ("Bob", "bob@example.com");
+
+    commit(
+        &repo,
+        alice,
+        now - 10 * DAY,
+        "initial commit",
+        "src/core.rs",
+        "fn a() {}\n",
+    );
+    commit(
+        &repo,
+        alice,
+        now - 8 * DAY,
+        "fix bug in core",
+        "src/core.rs",
+        "fn a() {}\nfn b() {}\n",
+    );
+    commit(
+        &repo,
+        bob,
+        now - 5 * DAY,
+        "add api",
+        "src/api.rs",
+        "fn api() {}\n",
+    );
+    commit(
+        &repo,
+        bob,
+        now - 2 * DAY,
+        "Revert \"add api\"",
+        "src/api.rs",
+        "// reverted\n",
+    );
+    commit(
+        &repo,
+        alice,
+        now - DAY,
+        "bump lockfile",
+        "Cargo.lock",
+        "locked\n",
+    );
+
+    let window = history::WindowOpts {
+        max_commits: 100,
+        days: None,
+        now,
+    };
+    let hist = history::collect(&repo, &window).unwrap();
+    assert_eq!(hist.metas.len(), 5);
+    assert_eq!(hist.window_commits, 5);
+
+    let line_counts = loc::head_line_counts(&repo).unwrap();
+    assert_eq!(line_counts.get("src/core.rs"), Some(&2));
+
+    let filter = PathFilter::new(None, true);
+    let report = metrics::Report::compute(&hist, &line_counts, &filter, now);
+
+    // Lockfile churn is filtered out of file-level metrics.
+    assert!(report.files.iter().all(|f| f.path != "Cargo.lock"));
+
+    let core = report
+        .files
+        .iter()
+        .find(|f| f.path == "src/core.rs")
+        .expect("core.rs tracked");
+    assert_eq!(core.churn, 2);
+    assert_eq!(core.bug_fixes, 1);
+    assert_eq!(core.authors, vec!["Alice".to_string()]);
+    assert!(
+        core.score > 0.0,
+        "churn ≥ 2 and present at HEAD → hotspot score"
+    );
+
+    assert_eq!(report.total_commits, 5);
+    assert_eq!(report.authors[0].name, "Alice");
+    assert_eq!(report.authors[0].commits, 3);
+    assert_eq!(report.firefight.count_last_year, 1);
+    assert_eq!(
+        report.firefight.recent,
+        vec!["Revert \"add api\"".to_string()]
+    );
+}
+
+#[test]
+fn window_cap_and_scope() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repository::init(dir.path()).unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let alice = ("Alice", "alice@example.com");
+
+    for i in 0..6 {
+        commit(
+            &repo,
+            alice,
+            now - (10 - i) * DAY,
+            &format!("change {i}"),
+            "app/main.rs",
+            &format!("// rev {i}\n"),
+        );
+        commit(
+            &repo,
+            alice,
+            now - (10 - i) * DAY + 100,
+            &format!("docs {i}"),
+            "docs/guide.md",
+            &format!("rev {i}\n"),
+        );
+    }
+
+    // Cap the window to the 4 most recent commits.
+    let hist = history::collect(
+        &repo,
+        &history::WindowOpts {
+            max_commits: 4,
+            days: None,
+            now,
+        },
+    )
+    .unwrap();
+    assert_eq!(hist.window_commits, 4);
+    assert_eq!(hist.metas.len(), 12);
+
+    // Scope to app/ — docs churn must disappear.
+    let line_counts = loc::head_line_counts(&repo).unwrap();
+    let scoped = PathFilter::new(Some("app".into()), true);
+    let report = metrics::Report::compute(&hist, &line_counts, &scoped, now);
+    assert_eq!(report.files.len(), 1);
+    assert_eq!(report.files[0].path, "app/main.rs");
+}
+
+#[test]
+fn markdown_export_writes_report() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repository::init(dir.path()).unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    commit(
+        &repo,
+        ("Alice", "alice@example.com"),
+        now - DAY,
+        "initial commit",
+        "src/main.rs",
+        "fn main() {}\n",
+    );
+
+    let hist = history::collect(
+        &repo,
+        &history::WindowOpts {
+            max_commits: 100,
+            days: None,
+            now,
+        },
+    )
+    .unwrap();
+    let line_counts = loc::head_line_counts(&repo).unwrap();
+    let report = metrics::Report::compute(&hist, &line_counts, &PathFilter::new(None, true), now);
+
+    let ctx = render::Context {
+        repo_root: "/tmp/example",
+        branch: "main",
+        scope: None,
+        window_desc: "last 1 non-merge commits",
+        top: 20,
+    };
+    let dest = dir.path().join("report.md");
+    export::write_markdown(&report, &ctx, &dest).unwrap();
+
+    let md = fs::read_to_string(&dest).unwrap();
+    assert!(md.starts_with("# Repository Health Report"));
+    assert!(md.contains("## 👥 Ownership & Bus Factor"));
+    assert!(md.contains("| Alice | 1 | 100% |"));
+}
+
+#[test]
+fn hostile_metadata_is_sanitized() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repository::init(dir.path()).unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    // ANSI color + OSC title escape in the message, table-breaking pipe and
+    // code-span-breaking backtick in the author name (angle brackets are
+    // already rejected by git signature parsing itself).
+    let evil = ("Mallory|`tick", "m@example.com");
+    commit(
+        &repo,
+        evil,
+        now - 2 * DAY,
+        "initial commit",
+        "src/a.rs",
+        "fn a() {}\n",
+    );
+    commit(
+        &repo,
+        evil,
+        now - DAY,
+        "Revert \"\u{1b}[31mevil\u{1b}]0;pwned\u{7}\"",
+        "src/a.rs",
+        "// reverted\n",
+    );
+
+    let hist = history::collect(
+        &repo,
+        &history::WindowOpts {
+            max_commits: 100,
+            days: None,
+            now,
+        },
+    )
+    .unwrap();
+
+    // Control characters never survive ingestion.
+    for meta in &hist.metas {
+        assert!(
+            !meta.summary.chars().any(char::is_control),
+            "summary: {:?}",
+            meta.summary
+        );
+        assert!(!meta.author.chars().any(char::is_control));
+    }
+    assert_eq!(hist.metas[0].summary, "Revert \"[31mevil]0;pwned\"");
+
+    // Markdown export escapes table/HTML metacharacters.
+    let line_counts = loc::head_line_counts(&repo).unwrap();
+    let report = metrics::Report::compute(&hist, &line_counts, &PathFilter::new(None, true), now);
+    let ctx = render::Context {
+        repo_root: "/tmp/example",
+        branch: "main",
+        scope: None,
+        window_desc: "last 2 non-merge commits",
+        top: 20,
+    };
+    let dest = dir.path().join("report.md");
+    export::write_markdown(&report, &ctx, &dest).unwrap();
+    let md = fs::read_to_string(&dest).unwrap();
+    assert!(md.contains("Mallory\\|'tick"), "author escaped in export");
+    assert!(!md.contains('\u{1b}'));
+}

@@ -1,0 +1,29 @@
+[package]
+name = "local-git-ops"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Offline git repository health dashboard: churn, hotspots, bus factor, bug clusters, velocity."
+license = "MIT"
+repository = "https://github.com/dandpz/local-git-ops"
+keywords = ["git", "cli", "metrics", "churn", "technical-debt"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+# default-features = false: no ssh/https transports — the tool is strictly
+# offline and this avoids pulling in an OpenSSL build.
+git2 = { version = "0.21", default-features = false }
+rayon = "1.12"
+comfy-table = "7.2"
+colored = "3.1"
+clap = { version = "4.6", features = ["derive"] }
+anyhow = "1"
+chrono = "0.4"
+regex = "1.12"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
