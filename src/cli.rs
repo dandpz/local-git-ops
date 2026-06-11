@@ -31,6 +31,14 @@ pub struct Cli {
     #[arg(long)]
     pub no_default_filters: bool,
 
+    /// Exclude commits by this author name (repeatable, case-insensitive)
+    #[arg(long = "exclude-author", value_name = "NAME")]
+    pub exclude_author: Vec<String>,
+
+    /// Exclude bot accounts (author names ending in "[bot]", e.g. dependabot[bot])
+    #[arg(long)]
+    pub exclude_bots: bool,
+
     /// Maximum rows per table
     #[arg(long, default_value_t = 20)]
     pub top: usize,

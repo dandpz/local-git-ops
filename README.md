@@ -30,6 +30,8 @@ local-git-ops --days 365           # window by time instead of count
 local-git-ops --path src           # scope file metrics to a prefix
 local-git-ops --export report.md   # also write the report as Markdown
 local-git-ops --export report.html # … or as a self-contained HTML page
+local-git-ops --exclude-bots       # ignore dependabot[bot] & friends
+local-git-ops --exclude-author "Jenkins CI" --exclude-author release-bot
 ```
 
 Run it from a subdirectory (`app/`, `src/`, …) and file metrics automatically
@@ -65,6 +67,9 @@ discipline, and squash-merge workflows compress authorship to whoever merged.
     --no-auto-scope    don't auto-scope to the current subdirectory
     --no-default-filters
                        include lockfiles/changelogs/vendored/generated files
+    --exclude-author <NAME>
+                       exclude commits by this author (repeatable, case-insensitive)
+    --exclude-bots     exclude bot accounts (author names ending in "[bot]")
     --top <N>          rows per table, default 20
     --export <FILE>    also write the report to a file; format chosen by
                        extension (.html/.htm → HTML, anything else → Markdown)

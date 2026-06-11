@@ -47,6 +47,43 @@ const NOISY_SUFFIXES: &[&str] = &[
     ".g.dart",
 ];
 
+/// Excludes commits by author — bot accounts and explicitly named users
+/// (e.g. dependabot) otherwise dominate churn, ownership and velocity.
+#[derive(Default)]
+pub struct AuthorFilter {
+    /// Lowercased author names to exclude.
+    names: std::collections::HashSet<String>,
+    exclude_bots: bool,
+}
+
+impl AuthorFilter {
+    pub fn new(names: &[String], exclude_bots: bool) -> Self {
+        Self {
+            names: names.iter().map(|n| n.trim().to_lowercase()).collect(),
+            exclude_bots,
+        }
+    }
+
+    pub fn excluded(&self, author: &str) -> bool {
+        let lower = author.to_lowercase();
+        self.names.contains(&lower) || (self.exclude_bots && lower.ends_with("[bot]"))
+    }
+
+    /// Human-readable summary for report headers; None when inactive.
+    pub fn describe(&self) -> Option<String> {
+        let mut parts: Vec<String> = self.names.iter().cloned().collect();
+        parts.sort();
+        if self.exclude_bots {
+            parts.push("*[bot]".to_string());
+        }
+        if parts.is_empty() {
+            None
+        } else {
+            Some(parts.join(", "))
+        }
+    }
+}
+
 pub struct PathFilter {
     /// Prefix relative to the repo root, always ending in '/', e.g. "src/".
     pub scope: Option<String>,
@@ -122,5 +159,36 @@ mod tests {
     fn no_default_filters_keeps_lockfiles() {
         let f = PathFilter::new(None, false);
         assert!(f.included("Cargo.lock"));
+    }
+
+    #[test]
+    fn author_filter_matches_names_case_insensitively() {
+        let f = AuthorFilter::new(&["Alice".to_string()], false);
+        assert!(f.excluded("alice"));
+        assert!(f.excluded("ALICE"));
+        assert!(!f.excluded("Bob"));
+        assert!(!f.excluded("dependabot[bot]"));
+    }
+
+    #[test]
+    fn author_filter_excludes_bots() {
+        let f = AuthorFilter::new(&[], true);
+        assert!(f.excluded("dependabot[bot]"));
+        assert!(f.excluded("Renovate[Bot]"));
+        assert!(!f.excluded("Bob"));
+        assert!(!f.excluded("robotics-team"));
+    }
+
+    #[test]
+    fn author_filter_default_excludes_nothing() {
+        let f = AuthorFilter::default();
+        assert!(!f.excluded("dependabot[bot]"));
+        assert!(f.describe().is_none());
+        assert_eq!(
+            AuthorFilter::new(&["Bob".into()], true)
+                .describe()
+                .as_deref(),
+            Some("bob, *[bot]")
+        );
     }
 }
