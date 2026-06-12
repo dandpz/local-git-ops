@@ -241,10 +241,21 @@ fn bug_clusters(h: &mut String, report: &Report, ctx: &Context) {
 }
 
 fn ownership(h: &mut String, report: &Report) {
-    let _ = writeln!(
-        h,
-        "<h2>👥 Ownership &amp; Bus Factor (full history, no merges)</h2>"
-    );
+    if report.ownership_scoped {
+        let _ = writeln!(
+            h,
+            "<h2>👥 Ownership &amp; Bus Factor (included paths, analysis window)</h2>"
+        );
+        let _ = writeln!(
+            h,
+            "<p class=\"note\">Scoped: only authors whose window commits touched included paths.</p>"
+        );
+    } else {
+        let _ = writeln!(
+            h,
+            "<h2>👥 Ownership &amp; Bus Factor (full history, no merges)</h2>"
+        );
+    }
     let _ = writeln!(
         h,
         "<table><thead><tr><th>Author</th><th class=\"num\">Commits</th>\

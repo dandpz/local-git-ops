@@ -31,6 +31,7 @@ local-git-ops --path src           # scope file metrics to a prefix
 local-git-ops --export report.md   # also write the report as Markdown
 local-git-ops --export report.html # … or as a self-contained HTML page
 local-git-ops --exclude-bots       # ignore dependabot[bot] & friends
+local-git-ops --exclude-path "docs/" --exclude-path "*.md"
 local-git-ops --exclude-author "Jenkins CI" --exclude-author release-bot
 ```
 
@@ -46,7 +47,7 @@ lockfiles/changelogs/vendored files.
 | 🔥 Maintenance Hotspots | Which files are both big and constantly changing? (churn × size score; flagged `CRITICAL` when they also attract bug fixes) |
 | 📈 Code Churn | What changes the most? (lockfiles, changelogs and generated code excluded by default) |
 | 🐛 Bug Clusters | Where do `fix`/`bug`/`broken` commits land? Files high on both this and the churn list are your single biggest risk. |
-| 👥 Ownership & Bus Factor | Who built this, who maintains it now? Flags a top contributor owning ≥60% of commits, top contributors inactive 6+ months, and single-author knowledge silos. |
+| 👥 Ownership & Bus Factor | Who built this, who maintains it now? Flags a top contributor owning ≥60% of commits, top contributors inactive 6+ months, and single-author knowledge silos. With `--path`/`--exclude-path`, ownership narrows to the authors who actually touched the included paths. |
 | 📊 Commit Velocity | Is the project accelerating or dying? Commits per month over the entire history, with trend detection (steady / declining / cliff / spiky). |
 | 🚒 Firefighting | How often does the team revert, hotfix or roll back? |
 
@@ -70,6 +71,9 @@ discipline, and squash-merge workflows compress authorship to whoever merged.
     --exclude-author <NAME>
                        exclude commits by this author (repeatable, case-insensitive)
     --exclude-bots     exclude bot accounts (author names ending in "[bot]")
+    --exclude-path <PATTERN>
+                       exclude paths (repeatable; globs: "*", "?", trailing "/"
+                       matches a subtree)
     --top <N>          rows per table, default 20
     --export <FILE>    also write the report to a file; format chosen by
                        extension (.html/.htm → HTML, anything else → Markdown)
