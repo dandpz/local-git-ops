@@ -104,6 +104,10 @@ pub struct Report {
     /// Indices into `files` with bug fixes, sorted by bug-fix count desc.
     pub bug_clusters: Vec<usize>,
     pub authors: Vec<AuthorStats>,
+    /// True when ownership was computed from the included paths in the
+    /// analysis window (user passed --path / --exclude-path) instead of the
+    /// full history.
+    pub ownership_scoped: bool,
     pub total_commits: usize,
     pub active_authors_last_year: usize,
     pub velocity: Velocity,
@@ -128,7 +132,15 @@ impl Report {
             .collect();
         bug_clusters.sort_by_key(|&i| std::cmp::Reverse(files[i].bug_fixes));
 
-        let authors = author_stats(history);
+        // With a user-narrowed path set, ownership answers "who contributed
+        // to these paths" from the analysis window; otherwise it keeps
+        // `git shortlog -sn --no-merges` full-history semantics.
+        let ownership_scoped = filter.is_restrictive();
+        let authors = if ownership_scoped {
+            scoped_author_stats(history, filter)
+        } else {
+            author_stats(history)
+        };
         let active_authors_last_year = authors
             .iter()
             .filter(|a| now - a.last_active <= 365 * DAY)
@@ -138,6 +150,7 @@ impl Report {
             hotspots,
             bug_clusters,
             authors,
+            ownership_scoped,
             total_commits: history.metas.len(),
             active_authors_last_year,
             velocity: velocity(history),
@@ -273,6 +286,37 @@ fn file_metrics(
         .collect();
     files.sort_by(|a, b| b.churn.cmp(&a.churn).then_with(|| a.path.cmp(&b.path)));
     files
+}
+
+/// Ownership over the included paths only: an author is counted once per
+/// window commit that touched at least one included file.
+fn scoped_author_stats(history: &History, filter: &PathFilter) -> Vec<AuthorStats> {
+    let mut commits_by_author: HashMap<&str, HashSet<usize>> = HashMap::new();
+    let mut total_commits: HashSet<usize> = HashSet::new();
+    for change in history.changes.iter().filter(|c| filter.included(&c.path)) {
+        let author = history.metas[change.meta_idx].author.as_str();
+        commits_by_author
+            .entry(author)
+            .or_default()
+            .insert(change.meta_idx);
+        total_commits.insert(change.meta_idx);
+    }
+    let total = total_commits.len().max(1) as f64;
+    let mut authors: Vec<AuthorStats> = commits_by_author
+        .into_iter()
+        .map(|(name, commit_idxs)| AuthorStats {
+            commits: commit_idxs.len() as u32,
+            share: commit_idxs.len() as f64 / total,
+            last_active: commit_idxs
+                .iter()
+                .map(|&i| history.metas[i].time)
+                .max()
+                .unwrap_or(0),
+            name: name.to_string(),
+        })
+        .collect();
+    authors.sort_by(|a, b| b.commits.cmp(&a.commits).then_with(|| a.name.cmp(&b.name)));
+    authors
 }
 
 fn author_stats(history: &History) -> Vec<AuthorStats> {
@@ -519,6 +563,49 @@ mod tests {
         assert!(dominant, "75% share should flag bus factor");
         assert!(inactive, "top author silent 200 days should flag inactive");
         assert_eq!(report.active_authors_last_year, 2);
+    }
+
+    #[test]
+    fn scoped_ownership_counts_only_contributors_to_included_paths() {
+        let metas = vec![
+            meta("Alice", 5, false, false),
+            meta("Alice", 4, false, false),
+            meta("Bob", 3, false, false),
+        ];
+        let changes = vec![
+            FileChange {
+                path: "src/a.rs".into(),
+                meta_idx: 0,
+            },
+            FileChange {
+                path: "src/a.rs".into(),
+                meta_idx: 1,
+            },
+            FileChange {
+                path: "docs/x.txt".into(),
+                meta_idx: 2,
+            },
+        ];
+        let history = History {
+            metas,
+            changes,
+            window_commits: 3,
+        };
+        let loc = HashMap::new();
+
+        let scoped = crate::filter::PathFilter::new(Some("src".into()), true);
+        let report = Report::compute(&history, &loc, &scoped, NOW);
+        assert!(report.ownership_scoped);
+        assert_eq!(report.authors.len(), 1);
+        assert_eq!(report.authors[0].name, "Alice");
+        assert_eq!(report.authors[0].commits, 2);
+        assert!((report.authors[0].share - 1.0).abs() < 1e-9);
+        assert_eq!(report.authors[0].last_active, NOW - 4 * DAY);
+
+        let unscoped = crate::filter::PathFilter::new(None, true);
+        let report = Report::compute(&history, &loc, &unscoped, NOW);
+        assert!(!report.ownership_scoped);
+        assert_eq!(report.authors.len(), 2);
     }
 
     #[test]

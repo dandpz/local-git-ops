@@ -170,7 +170,15 @@ fn bug_clusters(report: &Report, ctx: &Context) {
 }
 
 fn ownership(report: &Report, ctx: &Context) {
-    section("👥 Ownership & Bus Factor (full history, no merges)");
+    if report.ownership_scoped {
+        section("👥 Ownership & Bus Factor (included paths, analysis window)");
+        println!(
+            "{}",
+            "  scoped: only authors whose window commits touched included paths".dimmed()
+        );
+    } else {
+        section("👥 Ownership & Bus Factor (full history, no merges)");
+    }
     let mut table = new_table();
     table.set_header(vec!["author", "commits", "share", "last active"]);
     for a in report.authors.iter().take(15) {

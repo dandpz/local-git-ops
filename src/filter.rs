@@ -88,6 +88,8 @@ pub struct PathFilter {
     /// Prefix relative to the repo root, always ending in '/', e.g. "src/".
     pub scope: Option<String>,
     pub use_default_filters: bool,
+    /// User-supplied exclusion patterns, compiled from globs.
+    excludes: Vec<regex::Regex>,
 }
 
 impl PathFilter {
@@ -99,7 +101,21 @@ impl PathFilter {
         Self {
             scope,
             use_default_filters,
+            excludes: Vec::new(),
         }
+    }
+
+    /// Add user exclusion patterns. Globs: `*` matches any run, `?` one
+    /// character; a trailing `/` matches the whole subtree (`docs/`).
+    pub fn with_excludes(mut self, patterns: &[String]) -> anyhow::Result<Self> {
+        for pattern in patterns {
+            let pattern = pattern.trim_start_matches("./");
+            self.excludes.push(
+                glob_to_regex(pattern)
+                    .map_err(|e| anyhow::anyhow!("invalid --exclude-path '{pattern}': {e}"))?,
+            );
+        }
+        Ok(self)
     }
 
     pub fn included(&self, path: &str) -> bool {
@@ -108,11 +124,37 @@ impl PathFilter {
         {
             return false;
         }
+        if self.excludes.iter().any(|re| re.is_match(path)) {
+            return false;
+        }
         if self.use_default_filters && is_noise(path) {
             return false;
         }
         true
     }
+
+    /// True when the user narrowed the path set (scope or explicit excludes);
+    /// ownership is then computed from the included paths only. The default
+    /// noise filters alone don't count — they must not change the full-history
+    /// bus-factor semantics.
+    pub fn is_restrictive(&self) -> bool {
+        self.scope.is_some() || !self.excludes.is_empty()
+    }
+}
+
+fn glob_to_regex(pattern: &str) -> Result<regex::Regex, regex::Error> {
+    let mut re = String::from("^");
+    for c in pattern.chars() {
+        match c {
+            '*' => re.push_str(".*"),
+            '?' => re.push('.'),
+            c => re.push_str(&regex::escape(&c.to_string())),
+        }
+    }
+    if !pattern.ends_with('/') {
+        re.push('$');
+    }
+    regex::Regex::new(&re)
 }
 
 fn is_noise(path: &str) -> bool {
@@ -159,6 +201,41 @@ mod tests {
     fn no_default_filters_keeps_lockfiles() {
         let f = PathFilter::new(None, false);
         assert!(f.included("Cargo.lock"));
+    }
+
+    #[test]
+    fn exclude_patterns_drop_paths() {
+        let f = PathFilter::new(None, true)
+            .with_excludes(&["docs/".into(), "*.md".into(), "src/generated.rs".into()])
+            .unwrap();
+        assert!(!f.included("docs/guide.txt"));
+        assert!(!f.included("README.md"));
+        assert!(!f.included("nested/notes.md"));
+        assert!(!f.included("src/generated.rs"));
+        assert!(f.included("src/main.rs"));
+        // Exact-match pattern must not act as a prefix.
+        assert!(f.included("src/generated.rs.bak"));
+    }
+
+    #[test]
+    fn restrictive_only_with_scope_or_excludes() {
+        assert!(!PathFilter::new(None, true).is_restrictive());
+        assert!(PathFilter::new(Some("src".into()), true).is_restrictive());
+        assert!(
+            PathFilter::new(None, true)
+                .with_excludes(&["*.md".into()])
+                .unwrap()
+                .is_restrictive()
+        );
+    }
+
+    #[test]
+    fn invalid_exclude_pattern_is_rejected_gracefully() {
+        // `(` is regex-escaped, so weird-but-valid filenames work as literals.
+        let f = PathFilter::new(None, true)
+            .with_excludes(&["weird(name.rs".into()])
+            .unwrap();
+        assert!(!f.included("weird(name.rs"));
     }
 
     #[test]

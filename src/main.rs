@@ -32,7 +32,8 @@ fn run() -> Result<()> {
         (None, true) => None,
     }
     .filter(|s| !s.is_empty());
-    let path_filter = filter::PathFilter::new(scope.clone(), !args.no_default_filters);
+    let path_filter = filter::PathFilter::new(scope.clone(), !args.no_default_filters)
+        .with_excludes(&args.exclude_path)?;
 
     let author_filter = filter::AuthorFilter::new(&args.exclude_author, args.exclude_bots);
     let excluded_desc = author_filter.describe();

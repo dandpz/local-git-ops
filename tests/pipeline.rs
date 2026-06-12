@@ -445,3 +445,72 @@ fn excluded_authors_vanish_from_all_metrics() {
     // Velocity counts only the remaining commits.
     assert_eq!(report.velocity.months.values().sum::<u32>(), 2);
 }
+
+#[test]
+fn exclude_paths_and_scoped_ownership() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repository::init(dir.path()).unwrap();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let alice = ("Alice", "alice@example.com");
+    let bob = ("Bob", "bob@example.com");
+
+    // Alice owns src/, Bob only ever touches docs and markdown.
+    commit(
+        &repo,
+        alice,
+        now - 6 * DAY,
+        "core work",
+        "src/core.rs",
+        "fn a() {}\n",
+    );
+    commit(
+        &repo,
+        alice,
+        now - 5 * DAY,
+        "more core",
+        "src/core.rs",
+        "fn a() {}\nfn b() {}\n",
+    );
+    commit(
+        &repo,
+        bob,
+        now - 4 * DAY,
+        "write docs",
+        "docs/guide.txt",
+        "guide\n",
+    );
+    commit(&repo, bob, now - 3 * DAY, "notes", "NOTES.md", "notes\n");
+
+    let hist = history::collect(
+        &repo,
+        &history::WindowOpts {
+            max_commits: 100,
+            days: None,
+            now,
+            authors: Default::default(),
+        },
+    )
+    .unwrap();
+    let line_counts = loc::head_line_counts(&repo).unwrap();
+
+    // --exclude-path docs/ + *.md: Bob's files drop out of file metrics AND
+    // Bob drops out of ownership, because the path set is user-narrowed.
+    let filter = PathFilter::new(None, true)
+        .with_excludes(&["docs/".to_string(), "*.md".to_string()])
+        .unwrap();
+    let report = metrics::Report::compute(&hist, &line_counts, &filter, now);
+
+    assert!(report.files.iter().all(|f| f.path.starts_with("src/")));
+    assert!(report.ownership_scoped);
+    assert_eq!(report.authors.len(), 1);
+    assert_eq!(report.authors[0].name, "Alice");
+    assert_eq!(report.authors[0].commits, 2);
+
+    // Without user narrowing, ownership keeps full-history semantics.
+    let report = metrics::Report::compute(&hist, &line_counts, &PathFilter::new(None, true), now);
+    assert!(!report.ownership_scoped);
+    assert_eq!(report.authors.len(), 2);
+}

@@ -23,6 +23,12 @@ pub struct Cli {
     #[arg(long)]
     pub path: Option<String>,
 
+    /// Exclude paths from the analysis (repeatable). Globs supported:
+    /// "*" matches any run, "?" one char, trailing "/" a whole subtree
+    /// (e.g. --exclude-path "docs/" --exclude-path "*.md")
+    #[arg(long = "exclude-path", value_name = "PATTERN")]
+    pub exclude_path: Vec<String>,
+
     /// Don't automatically scope to the current subdirectory when run below the repo root
     #[arg(long)]
     pub no_auto_scope: bool,
