@@ -71,6 +71,11 @@ Microsoft Research 2005; Adam Tornhill, *Your Code as a Crime Scene*): change
 frequency predicts defects better than static complexity alone, and the
 overlap of high churn with high bug density marks the riskiest code.
 
+This project was inspired by Ally Piechowski's
+[*The Git Commands I Run Before Reading Any Code*](https://piechowski.io/post/git-commands-before-reading-code),
+which walks through the same diagnostics as ad-hoc `git log` commands —
+`local-git-ops` turns them into a single offline report.
+
 Caveats worth knowing: bug and firefight detection depend on commit message
 discipline, and squash-merge workflows compress authorship to whoever merged.
 
