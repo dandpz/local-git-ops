@@ -1,10 +1,9 @@
 //! End-to-end pipeline test against a real repository built with git2.
 
-use git2::{Repository, Signature, Time};
+use git2::{IndexEntry, IndexTime, Oid, Repository, Signature, Time};
 use local_git_ops::filter::PathFilter;
 use local_git_ops::{export, history, html, loc, metrics, render};
 use std::fs;
-use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const DAY: i64 = 86_400;
@@ -17,13 +16,26 @@ fn commit(
     file: &str,
     content: &str,
 ) {
-    let workdir = repo.workdir().unwrap();
-    let path = workdir.join(file);
-    fs::create_dir_all(path.parent().unwrap()).unwrap();
-    fs::write(&path, content).unwrap();
-
+    // Stage the blob straight into the index from a buffer rather than writing
+    // it to the working directory. The analysis only ever reads the git tree,
+    // and this keeps paths like "src/<script>.rs" — legal on Unix, rejected by
+    // the Windows filesystem — testable on every platform.
     let mut index = repo.index().unwrap();
-    index.add_path(Path::new(file)).unwrap();
+    let entry = IndexEntry {
+        ctime: IndexTime::new(0, 0),
+        mtime: IndexTime::new(0, 0),
+        dev: 0,
+        ino: 0,
+        mode: 0o100_644,
+        uid: 0,
+        gid: 0,
+        file_size: 0,
+        id: Oid::ZERO_SHA1,
+        flags: 0,
+        flags_extended: 0,
+        path: file.as_bytes().to_vec(),
+    };
+    index.add_frombuffer(&entry, content.as_bytes()).unwrap();
     index.write().unwrap();
     let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
 
