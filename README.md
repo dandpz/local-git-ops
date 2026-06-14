@@ -16,23 +16,38 @@ seconds.
 
 ## Install
 
+The installed command is `lgo`.
+
 ```sh
+# Prebuilt binary, checksum-verified (Linux/macOS):
+curl -fsSL https://raw.githubusercontent.com/dandpz/local-git-ops/main/install.sh | sh
+
+# Prebuilt binary via cargo-binstall:
+cargo binstall local-git-ops
+
+# From crates.io (builds from source):
+cargo install local-git-ops
+
+# From a local checkout:
 cargo install --path .
 ```
+
+Windows users: download the `.zip` from the
+[releases page](https://github.com/dandpz/local-git-ops/releases).
 
 ## Usage
 
 ```sh
 cd your-repo
-local-git-ops                      # dashboard for the last 100 non-merge commits
-local-git-ops -n 1000              # widen the analysis window
-local-git-ops --days 365           # window by time instead of count
-local-git-ops --path src           # scope file metrics to a prefix
-local-git-ops --export report.md   # also write the report as Markdown
-local-git-ops --export report.html # … or as a self-contained HTML page
-local-git-ops --exclude-bots       # ignore dependabot[bot] & friends
-local-git-ops --exclude-path "docs/" --exclude-path "*.md"
-local-git-ops --exclude-author "Jenkins CI" --exclude-author release-bot
+lgo                      # dashboard for the last 100 non-merge commits
+lgo -n 1000              # widen the analysis window
+lgo --days 365           # window by time instead of count
+lgo --path src           # scope file metrics to a prefix
+lgo --export report.md   # also write the report as Markdown
+lgo --export report.html # … or as a self-contained HTML page
+lgo --exclude-bots       # ignore dependabot[bot] & friends
+lgo --exclude-path "docs/" --exclude-path "*.md"
+lgo --exclude-author "Jenkins CI" --exclude-author release-bot
 ```
 
 Run it from a subdirectory (`app/`, `src/`, …) and file metrics automatically
@@ -91,9 +106,12 @@ make run ARGS="--export report.md"
 ```
 
 CI (GitHub Actions) runs lint, tests (Linux + macOS) and an MSRV (1.88) check
-for every push and pull request. Tagging `v*` builds tested release binaries
-for Linux (x86_64 gnu/musl, arm64), macOS (x86_64, arm64) and Windows, then
-publishes them in a single release with a combined `SHA256SUMS` file.
+for every push and pull request. Releases are automated with
+[release-plz](https://release-plz.dev/): merges to `main` open a release PR
+that bumps the version and updates `CHANGELOG.md`; merging it publishes the
+crate to crates.io and pushes a `v*` tag. The tag triggers a build of tested
+release binaries for Linux (x86_64 gnu/musl, arm64), macOS (x86_64, arm64) and
+Windows, published in a single GitHub Release with a combined `SHA256SUMS` file.
 
 ## License
 

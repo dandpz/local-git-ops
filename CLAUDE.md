@@ -18,7 +18,17 @@ cargo test --test pipeline hostile              # single integration test by sub
 cargo test metrics::tests::trend_sparse         # single unit test
 ```
 
-CI (`.github/workflows/ci.yml`) has three jobs: lint (fmt + clippy, ubuntu only), test matrix (Linux + macOS, plus a release-profile build on ubuntu to catch LTO breakage), and MSRV (`rust-version` in Cargo.toml, currently 1.88 — floor set by let-chains in our code and comfy-table). Everything runs `--locked` — keep `Cargo.lock` committed. The release workflow builds 6 targets, tests each, then a single `publish` job uploads all artifacts plus a combined `SHA256SUMS` atomically (never let per-matrix-job release uploads back in — partial releases). Actions are pinned to commit SHAs (dependabot refreshes them); keep the `# vN` comment when bumping.
+CI (`.github/workflows/ci.yml`) has three jobs: lint (fmt + clippy, ubuntu only), test matrix (Linux + macOS, plus a release-profile build on ubuntu to catch LTO breakage), and MSRV (`rust-version` in Cargo.toml, currently 1.88 — floor set by let-chains in our code and comfy-table). Everything runs `--locked` — keep `Cargo.lock` committed. The release workflow builds 6 targets, tests each, then a single `publish` job uploads all artifacts plus a combined `SHA256SUMS` atomically (never let per-matrix-job release uploads back in — partial releases). `ci.yml` pins actions to commit SHAs with a `# vN` comment (dependabot refreshes them); keep the comment when bumping. The release workflows (`release.yml`, `release-plz.yml`) intentionally use floating major-version tags (`@v4`, `@stable`, `@v0.5`) to stay aligned with the env-shield publishing setup they were ported from.
+
+## Releases
+
+Automated with [release-plz](https://release-plz.dev/) (`release-plz.toml`, `.github/workflows/release-plz.yml`). The installed binary is `lgo` (`[[bin]]`); the crate keeps its full name `local-git-ops`. Flow:
+
+1. Merge to `main` → `release-plz-pr` opens/updates a release PR (bumps `Cargo.toml` version, writes `CHANGELOG.md`).
+2. Merge that PR → `release-plz-release` publishes the crate to crates.io and pushes tag `v{version}` using `RELEASE_PLZ_TOKEN` (a PAT — a `GITHUB_TOKEN`-pushed tag would **not** trigger the next workflow).
+3. The tag triggers `release.yml`, which owns the GitHub Release. `release-plz.toml` sets `git_release_enable = false` so release-plz never creates a duplicate.
+
+crates.io auth is two-step (trusted publishing can't be configured before the crate exists): **Phase A** (current) publishes with a `CARGO_REGISTRY_TOKEN` API-token secret. **Phase B**, after the first publish, switches `release-plz-release` to OIDC — add `id-token: write`, a `rust-lang/crates-io-auth-action` step, set `CARGO_REGISTRY_TOKEN` to `${{ steps.auth.outputs.token }}`, then delete the secret. The archive layout in `release.yml` (`local-git-ops-<ver>-<target>/lgo`) must stay in sync with `[package.metadata.binstall]` in Cargo.toml — `cargo binstall` resolves against it.
 
 ## Architecture
 
