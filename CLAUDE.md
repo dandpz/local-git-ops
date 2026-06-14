@@ -28,7 +28,7 @@ Automated with [release-plz](https://release-plz.dev/) (`release-plz.toml`, `.gi
 2. Merge that PR → `release-plz-release` publishes the crate to crates.io and pushes tag `v{version}` using `RELEASE_PLZ_TOKEN` (a PAT — a `GITHUB_TOKEN`-pushed tag would **not** trigger the next workflow).
 3. The tag triggers `release.yml`, which owns the GitHub Release. `release-plz.toml` sets `git_release_enable = false` so release-plz never creates a duplicate.
 
-crates.io auth is two-step (trusted publishing can't be configured before the crate exists): **Phase A** (current) publishes with a `CARGO_REGISTRY_TOKEN` API-token secret. **Phase B**, after the first publish, switches `release-plz-release` to OIDC — add `id-token: write`, a `rust-lang/crates-io-auth-action` step, set `CARGO_REGISTRY_TOKEN` to `${{ steps.auth.outputs.token }}`, then delete the secret. The archive layout in `release.yml` (`local-git-ops-<ver>-<target>/lgo`) must stay in sync with `[package.metadata.binstall]` in Cargo.toml — `cargo binstall` resolves against it.
+crates.io publishing uses OIDC trusted publishing: `release-plz-release` has `id-token: write`, a `rust-lang/crates-io-auth-action` step mints a short-lived token, and `CARGO_REGISTRY_TOKEN` is set to `${{ steps.auth.outputs.token }}` — no long-lived registry secret. (This was bootstrapped via a one-time API-token publish, since a trusted publisher can't be configured before the crate exists.) The archive layout in `release.yml` (`local-git-ops-<ver>-<target>/lgo`) must stay in sync with `[package.metadata.binstall]` in Cargo.toml — `cargo binstall` resolves against it.
 
 ## Architecture
 

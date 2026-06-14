@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # crates.io trusted publishing: mint a short-lived token via OIDC.
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,15 +25,14 @@ jobs:
           # trigger the release.yml binary-build workflow.
           token: ${{ secrets.RELEASE_PLZ_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
-      # Phase A: publish with a crates.io API token (CARGO_REGISTRY_TOKEN
-      # secret). Trusted publishing can't be set up until the crate exists —
-      # once it does, switch this job to OIDC (see CLAUDE.md "Releases").
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
       - uses: release-plz/action@v0.5
         with:
           command: release
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
   release-plz-pr:
     name: open release PR
