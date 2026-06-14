@@ -1,4 +1,5 @@
 CARGO ?= cargo
+# Package name (for `cargo uninstall`); the installed command is `lgo`.
 BIN   := local-git-ops
 
 .DEFAULT_GOAL := help
@@ -14,7 +15,7 @@ build: ## Debug build
 release: ## Optimized release build
 	$(CARGO) build --release
 
-install: ## Install $(BIN) into ~/.cargo/bin
+install: ## Install the `lgo` command into ~/.cargo/bin
 	$(CARGO) install --path . --locked
 
 uninstall: ## Remove the installed binary

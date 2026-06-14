@@ -8,6 +8,25 @@ license = "MIT"
 repository = "https://github.com/dandpz/local-git-ops"
 keywords = ["git", "cli", "metrics", "churn", "technical-debt"]
 categories = ["command-line-utilities", "development-tools"]
+# Keep the published package to what `cargo install` needs (plus the README
+# image so crates.io renders it).
+include = ["src/**", "LICENSE", "README.md", "assets/**"]
+
+# Installed command is `lgo`; the crate keeps its full name `local-git-ops`.
+[[bin]]
+name = "lgo"
+path = "src/main.rs"
+
+# `cargo binstall local-git-ops` — must match the archive layout produced by
+# the Package step in .github/workflows/release.yml: an archive named
+# local-git-ops-<version>-<target> containing <that dir>/lgo.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-{ target }{ archive-suffix }"
+bin-dir = "{ name }-{ version }-{ target }/{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
 
 [dependencies]
 # default-features = false: no ssh/https transports — the tool is strictly
