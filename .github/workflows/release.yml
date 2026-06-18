@@ -100,7 +100,7 @@ jobs:
           cat *.sha256 > SHA256SUMS
           rm *.sha256
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: artifacts/*
           generate_release_notes: true
