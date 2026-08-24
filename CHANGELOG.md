@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/dandpz/local-git-ops/compare/v0.1.0...v0.1.1) - 2026-08-24
+
+### Other
+
+- *(deps)* update lockfile to fix RUSTSEC-2026-0204 ([#23](https://github.com/dandpz/local-git-ops/pull/23))
+- credit the blog post that inspired the project ([#11](https://github.com/dandpz/local-git-ops/pull/11))
+
 ## [0.1.0]
 
 ### Added

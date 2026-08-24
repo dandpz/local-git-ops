@@ -1,6 +1,6 @@
 [package]
 name = "local-git-ops"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.88"
 description = "Offline git repository health dashboard: churn, hotspots, bus factor, bug clusters, velocity."
