@@ -33,7 +33,7 @@ pkg-fmt = "zip"
 # offline and this avoids pulling in an OpenSSL build.
 git2 = { version = "0.21", default-features = false }
 rayon = "1.12"
-comfy-table = "7.2"
+comfy-table = "8.0"
 colored = "3.1"
 clap = { version = "4.6", features = ["derive"] }
 anyhow = "1"
